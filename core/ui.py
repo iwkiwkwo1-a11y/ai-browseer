@@ -9,8 +9,28 @@ def render_terminal_ui(task, step, max_steps, agent_state, action_str, action_re
 
     reflection = agent_state.get("reflection", "")
     plan = agent_state.get("plan", "")
-    memory = agent_state.get("memory", "")
+    memory_obj = agent_state.get("memory", {})
     thought = agent_state.get("thought", "")
+
+    # Format Structured Memory ke HTML
+    mem_html = ""
+    if isinstance(memory_obj, dict):
+        facts = memory_obj.get("facts", [])
+        fails = memory_obj.get("failed_paths", [])
+        notes = memory_obj.get("notes", "")
+
+        mem_html += "<strong>Facts:</strong><ul style='margin-top:2px; margin-bottom:5px; padding-left:15px;'>"
+        for f in facts: mem_html += f"<li>{f}</li>"
+        mem_html += "</ul>"
+
+        if fails:
+            mem_html += "<strong style='color:#ff7b72;'>Failed Paths:</strong><ul style='margin-top:2px; margin-bottom:5px; padding-left:15px;'>"
+            for f in fails: mem_html += f"<li>{f}</li>"
+            mem_html += "</ul>"
+
+        mem_html += f"<strong>Notes:</strong> {notes}"
+    else:
+        mem_html = str(memory_obj)
 
     html = f"""
     <div style="font-family: 'Courier New', Courier, monospace; background-color: #0d1117; color: #c9d1d9; padding: 15px; border-radius: 5px; max-width: 900px; margin: 0 auto; box-shadow: 0 4px 8px rgba(0,0,0,0.5);">
@@ -25,8 +45,8 @@ def render_terminal_ui(task, step, max_steps, agent_state, action_str, action_re
                 <div style="font-size: 13px;">{plan}</div>
             </div>
             <div style="flex: 1; border: 1px solid #30363d; padding: 10px; border-radius: 4px; background-color: #161b22;">
-                <div style="color: #3fb950; font-weight: bold; margin-bottom: 5px; border-bottom: 1px dashed #30363d;">🧠 MEMORY (NOTES)</div>
-                <div style="font-size: 13px;">{memory}</div>
+                <div style="color: #3fb950; font-weight: bold; margin-bottom: 5px; border-bottom: 1px dashed #30363d;">🧠 STRUCTURED MEMORY</div>
+                <div style="font-size: 13px;">{mem_html}</div>
             </div>
         </div>
 
