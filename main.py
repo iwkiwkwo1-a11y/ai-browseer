@@ -13,11 +13,13 @@ def check_and_install_deps():
         import accelerate
         import nest_asyncio
         import IPython
+        import pypdf
+        import aiohttp
     except ImportError:
-        print("[SYSTEM] Menginstal dependensi (transformers, playwright, etc)...")
+        print("[SYSTEM] Menginstal dependensi (transformers, playwright, pypdf, aiohttp, etc)...")
         subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "-U",
                                "transformers", "bitsandbytes", "accelerate",
-                               "playwright", "nest_asyncio", "ipython"])
+                               "playwright", "nest_asyncio", "ipython", "pypdf", "aiohttp"])
         print("[SYSTEM] Menginstal Chromium untuk Playwright...")
         subprocess.check_call([sys.executable, "-m", "playwright", "install", "chromium"])
         subprocess.check_call([sys.executable, "-m", "playwright", "install-deps", "chromium"])
@@ -148,6 +150,8 @@ async def run_loop(task, max_steps=15):
                 arg1 = args.get("seconds")
             elif action == "EXTRACT_TEXT":
                 pass # tidak butuh args
+            elif action == "READ_PDF":
+                arg1 = args.get("url")
 
             action_result = await env.execute_action(action, arg1, arg2)
 

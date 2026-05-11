@@ -31,6 +31,7 @@ Tersedia Action:
 - "PRESS_KEY": Tekan tombol keyboard seperti "Escape", "Enter". (args: { "key": "..." })
 - "WAIT": Tunggu beberapa detik jika web memuat. (args: { "seconds": "3" })
 - "EXTRACT_TEXT": Mengambil seluruh teks artikel/bacaan dari halaman untuk dianalisis. (args: {})
+- "READ_PDF": Membaca dan mengekstrak teks dari tautan PDF. (args: { "url": "..." })
 - "DONE": Selesaikan tugas. (args: { "result": "..." })
 
 ATURAN KRITIS (ANTI-LOOPING & KEAMANAN):

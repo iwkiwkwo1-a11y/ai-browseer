@@ -1,7 +1,10 @@
 import asyncio
+import io
+import aiohttp
+from pypdf import PdfReader
 from playwright.async_api import async_playwright
 
-JS_EXTRACT_DOM = """
+JS_EXTRACT_DOM = r"""
 () => {
     let elements = [];
     let id_counter = 0;
@@ -48,7 +51,7 @@ JS_EXTRACT_DOM = """
 """
 
 # Script kecil untuk membantu menghindari deteksi bot sederhana
-STEALTH_SCRIPT = """
+STEALTH_SCRIPT = r"""
 () => {
     Object.defineProperty(navigator, 'webdriver', {
       get: () => undefined
@@ -182,6 +185,35 @@ class BrowserEnv:
                 # Bersihkan spasi kosong dan batasi panjang teks
                 clean_text = ' '.join(text_content.split())
                 return clean_text[:2000] + ("..." if len(clean_text) > 2000 else "")
+
+            elif action_type == "READ_PDF":
+                pdf_url = arg1
+                if not pdf_url:
+                    return "Error: URL PDF tidak diberikan."
+
+                if not pdf_url.startswith("http"):
+                    pdf_url = "https://" + pdf_url
+
+                try:
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(pdf_url, timeout=30) as resp:
+                            if resp.status == 200:
+                                pdf_data = await resp.read()
+                                reader = PdfReader(io.BytesIO(pdf_data))
+                                text = ""
+                                # Baca maksimal 5 halaman pertama untuk mencegah context overflow
+                                max_pages = min(5, len(reader.pages))
+                                for i in range(max_pages):
+                                    page_text = reader.pages[i].extract_text()
+                                    if page_text:
+                                        text += page_text + " "
+
+                                clean_text = ' '.join(text.split())
+                                return clean_text[:2500] + ("..." if len(clean_text) > 2500 else "")
+                            else:
+                                return f"Error mengunduh PDF, HTTP status: {resp.status}"
+                except Exception as e:
+                    return f"Gagal membaca PDF: {str(e)}"
 
             elif action_type == "DONE":
                 return "Tugas dinyatakan selesai oleh AI."
