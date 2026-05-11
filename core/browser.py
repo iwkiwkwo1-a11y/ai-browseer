@@ -59,12 +59,15 @@ STEALTH_SCRIPT = r"""
 }
 """
 
+import os
+
 class BrowserEnv:
     def __init__(self):
         self.playwright = None
         self.browser = None
         self.context = None
         self.page = None
+        self.pages = []  # List untuk menyimpan multiple tabs
         self.interactable_elements = []
 
     async def start(self):
@@ -86,26 +89,40 @@ class BrowserEnv:
         # Injeksi stealth script ke setiap halaman baru
         await self.context.add_init_script(STEALTH_SCRIPT)
         self.page = await self.context.new_page()
+        self.pages.append(self.page)
 
     async def get_state(self):
         if not self.page:
             return "Browser belum dimulai.", [], None
 
-        url = self.page.url
-        title = await self.page.title()
-
-        # Ambil screenshot
-        screenshot_bytes = await self.page.screenshot(type='jpeg', quality=60)
+        # Pengecekan tab aktif
+        try:
+            url = self.page.url
+            title = await self.page.title()
+            screenshot_bytes = await self.page.screenshot(type='jpeg', quality=60)
+        except Exception:
+            # Jika tab terlanjur tertutup/mati, kembalikan ke tab sebelumnya jika ada
+            if self.pages and len(self.pages) > 0:
+                self.page = self.pages[-1]
+                url = self.page.url
+                title = await self.page.title()
+                screenshot_bytes = await self.page.screenshot(type='jpeg', quality=60)
+            else:
+                return "Semua tab tertutup.", [], None
 
         # Ekstrak elemen interactable
         elements = await self.page.evaluate(JS_EXTRACT_DOM)
         self.interactable_elements = elements
 
+        # Informasi Tab Aktif
+        current_tab_idx = self.pages.index(self.page) if self.page in self.pages else 0
+        total_tabs = len(self.pages)
+
         # Batasi agar tidak OOM (Out of Memory)
         MAX_ELEMENTS = 75
         limited_elements = elements[:MAX_ELEMENTS]
 
-        dom_text = f"URL saat ini: {url}\nJudul: {title}\nElemen yang bisa diklik:\n"
+        dom_text = f"=== STATUS BROWSER ===\nTab Aktif: [{current_tab_idx + 1} dari {total_tabs}]\nURL saat ini: {url}\nJudul: {title}\n\nElemen yang bisa diklik (Maks {MAX_ELEMENTS}):\n"
         if not limited_elements:
             dom_text += "Tidak ada elemen interaktif yang ditemukan."
         for el in limited_elements:
@@ -192,6 +209,78 @@ class BrowserEnv:
                 # Bersihkan spasi kosong dan batasi panjang teks (limit keras agar tidak OOM)
                 clean_text = ' '.join(text_content.split())
                 return clean_text[:1200] + ("..." if len(clean_text) > 1200 else "")
+
+            elif action_type == "NEW_TAB":
+                url = arg1
+                if url and not url.startswith("http"):
+                    url = "https://" + url
+                new_page = await self.context.new_page()
+                self.pages.append(new_page)
+                self.page = new_page # Pindah fokus
+                if url:
+                    await self.page.goto(url, timeout=45000, wait_until="domcontentloaded")
+                    await asyncio.sleep(2)
+                    return f"Berhasil membuka tab baru dan pergi ke {url}."
+                return "Berhasil membuka tab kosong baru."
+
+            elif action_type == "SWITCH_TAB":
+                try:
+                    tab_index = int(arg1) - 1 # Agent pakai 1-based index
+                    if 0 <= tab_index < len(self.pages):
+                        self.page = self.pages[tab_index]
+                        await self.page.bring_to_front()
+                        await asyncio.sleep(1)
+                        return f"Berhasil pindah ke Tab {tab_index + 1} ({self.page.url})."
+                    else:
+                        return f"Error: Tab {tab_index + 1} tidak ada. Total tab: {len(self.pages)}."
+                except:
+                    return "Error: arg1 harus berupa nomor tab."
+
+            elif action_type == "CLOSE_TAB":
+                if len(self.pages) > 1:
+                    await self.page.close()
+                    self.pages.remove(self.page)
+                    self.page = self.pages[-1] # Fokus ke tab terakhir
+                    await self.page.bring_to_front()
+                    return "Tab saat ini ditutup. Fokus kembali ke tab sebelumnya."
+                else:
+                    return "Gagal menutup tab. Ini adalah tab terakhir."
+
+            elif action_type == "SCROLL_TO_TEXT":
+                search_text = arg1
+                if not search_text:
+                    return "Error: arg1 (teks pencarian) kosong."
+
+                # Injeksi JS untuk mencari teks dan men-scroll
+                found = await self.page.evaluate(f'''(text) => {{
+                    let elements = Array.from(document.body.querySelectorAll("*:not(script):not(style)"));
+                    for (let el of elements) {{
+                        if (el.children.length === 0 && el.textContent.toLowerCase().includes(text.toLowerCase())) {{
+                            el.scrollIntoView({{behavior: "smooth", block: "center"}});
+                            return true;
+                        }}
+                    }}
+                    return false;
+                }}''', search_text)
+                await asyncio.sleep(2)
+                if found:
+                    return f"Berhasil menemukan dan scroll ke bagian teks '{search_text}'."
+                else:
+                    return f"Teks '{search_text}' tidak ditemukan di halaman ini."
+
+            elif action_type == "SAVE_REPORT":
+                filename = arg1 if arg1 else "report.txt"
+                content = arg2 if arg2 else ""
+
+                # Mencegah escape/directory traversal
+                filename = filename.replace("/", "_").replace("\\\\", "_")
+                if not filename.endswith((".txt", ".md", ".csv")):
+                    filename += ".md"
+
+                filepath = os.path.join(os.getcwd(), filename)
+                with open(filepath, "w", encoding="utf-8") as f:
+                    f.write(content)
+                return f"Berhasil menyimpan laporan ke file: {filepath}"
 
             elif action_type == "READ_PDF":
                 pdf_url = arg1

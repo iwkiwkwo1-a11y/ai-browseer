@@ -153,6 +153,17 @@ async def run_loop(task, max_steps=15):
                 pass # tidak butuh args
             elif action == "READ_PDF":
                 arg1 = args.get("url")
+            elif action == "NEW_TAB":
+                arg1 = args.get("url")
+            elif action == "SWITCH_TAB":
+                arg1 = args.get("index")
+            elif action == "CLOSE_TAB":
+                pass
+            elif action == "SCROLL_TO_TEXT":
+                arg1 = args.get("text")
+            elif action == "SAVE_REPORT":
+                arg1 = args.get("filename")
+                arg2 = args.get("content")
 
             action_result = await env.execute_action(action, arg1, arg2)
 

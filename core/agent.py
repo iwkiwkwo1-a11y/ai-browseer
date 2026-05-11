@@ -26,20 +26,25 @@ Anda HARUS merespons dalam format JSON valid yang berisi atribut kognitif beriku
 
 Tersedia Action:
 - "GOTO": Pergi ke URL. (args: { "url": "..." })
+- "NEW_TAB": Buka tab baru. Gunakan untuk meneliti tautan dari hasil pencarian agar Anda tidak kehilangan halaman utama. (args: { "url": "..." })
+- "SWITCH_TAB": Pindah ke tab lain. (args: { "index": "2" })
+- "CLOSE_TAB": Tutup tab saat ini. (args: {})
 - "CLICK": Klik elemen berdasarkan ID. (args: { "id": "..." })
 - "TYPE": Ketik teks ke elemen berdasarkan ID dan tekan Enter. (args: { "id": "...", "text": "..." })
-- "SCROLL_DOWN": Gulir ke bawah halaman. (Gunakan jika elemen yang dicari tidak ada di list 75 elemen saat ini). (args: {})
+- "SCROLL_DOWN": Gulir ke bawah halaman. (args: {})
+- "SCROLL_TO_TEXT": Cari dan gulir layar langsung ke teks tertentu. Jauh lebih efektif daripada SCROLL_DOWN manual! (args: { "text": "..." })
 - "GO_BACK": Mundur ke halaman sebelumnya. (Gunakan jika tersesat/buntu). (args: {})
 - "PRESS_KEY": Tekan tombol keyboard seperti "Escape" (untuk tutup popup), "Enter". (args: { "key": "..." })
 - "WAIT": Tunggu jika web memuat lambat. (args: { "seconds": "3" })
 - "EXTRACT_TEXT": Mengambil seluruh teks artikel (terbatas 1200 char) dari halaman untuk dianalisis. (args: {})
 - "READ_PDF": Membaca dan mengekstrak teks (terbatas 1500 char) dari tautan PDF. (args: { "url": "..." })
+- "SAVE_REPORT": Menyimpan data penting/laporan dari memory Anda ke file fisik. Lakukan ini sebelum 'DONE' jika pengguna meminta data dicatat. (args: { "filename": "hasil.txt", "content": "..." })
 - "DONE": Selesaikan tugas, berikan jawaban akhir. (args: { "result": "..." })
 
 ATURAN KRITIS (ANTI-LOOPING & MEMORI):
-1. Jika history aksi menunjukkan Anda melakukan hal yang sama tanpa hasil (halaman tidak berubah), JANGAN ULANGI! Catat di memory bahwa tombol/jalur itu rusak, lalu gunakan 'GO_BACK' atau cari ID elemen lain.
-2. JANGAN mengosongkan 'memory' di JSON jika sebelumnya sudah ada catatan berharga. Terus tumpuk/tulis ulang dengan tambahan data baru.
-3. Segera selesaikan tugas ("DONE") jika informasi yang diminta sudah lengkap di dalam 'memory' Anda.
+1. MANAJEMEN TAB: Jangan ragu menggunakan 'NEW_TAB' saat membaca artikel dari Google agar Anda bisa kembali ke halaman pencarian dengan 'CLOSE_TAB'.
+2. JANGAN MENGULANG: Jika history aksi menunjukkan Anda melakukan hal yang sama tanpa hasil, JANGAN ULANGI! Gunakan 'GO_BACK', 'SCROLL_TO_TEXT', atau cari elemen lain.
+3. MEMORI PERSISTEN: JANGAN mengosongkan 'memory' di JSON jika sebelumnya sudah ada catatan berharga. Terus tumpuk/tulis ulang.
 """
 
 class BrowserAgent:
