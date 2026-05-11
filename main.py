@@ -88,30 +88,34 @@ async def run_loop(task, max_steps=15):
 
             # Mempersiapkan state UI kosong
             ui_state = {
-                "reflection": "...",
-                "plan": agent.current_plan,
-                "memory": agent.current_memory,
-                "thought": "Membaca DOM dan Memikirkan langkah selanjutnya..."
+                "reasoning_engine": {
+                    "observation_analysis": "...",
+                    "goal_progress": "...",
+                    "next_step_logic": "Membaca state JSON browser..."
+                },
+                "plan_update": agent.current_plan,
+                "memory_update": agent.current_memory
             }
 
             # Tampilkan ke UI sebelum diproses (Status: Thinking)
             render_terminal_ui(task, step, max_steps, ui_state, "...", action_result, screenshot)
 
-            # Agent mengambil keputusan
+            # Agent mengambil keputusan (dom_text sekarang adalah dict JSON)
             decision = agent.get_decision(task, history, dom_text)
 
             # Validasi Error parsing
             if "error" in decision:
                 action_result = f"Error dari AI: {decision['error']}"
-                history.append(f"AI ERROR: {decision['error']}")
-                ui_state["thought"] = "Gagal memproses JSON. Mencoba lagi."
+                history.append({"action": "Koreksi JSON", "result": action_result})
+                ui_state["reasoning_engine"]["next_step_logic"] = "Gagal memproses JSON. Mencoba lagi."
                 render_terminal_ui(task, step, max_steps, ui_state, "Koreksi JSON", action_result, screenshot)
                 await asyncio.sleep(2)
                 continue
 
-            thought = decision.get("thought", "Tidak ada thought")
-            action = decision.get("action", "")
-            args = decision.get("args", {})
+            # Ambil struktur OpenClaw
+            command = decision.get("command", {})
+            action = command.get("name", "")
+            args = command.get("args", {})
 
             ui_state = decision
             ui_state["plan"] = agent.current_plan
@@ -167,8 +171,11 @@ async def run_loop(task, max_steps=15):
 
             action_result = await env.execute_action(action, arg1, arg2)
 
-            # Catat history (Penting agar tidak looping)
-            history.append(f"Aksi: {action_str} -> Hasil: {action_result}")
+            # Catat history dengan JSON terstruktur
+            history.append({
+                "action": action_str,
+                "result": action_result
+            })
 
             # [ANTI-OOM] Bersihkan sampah memori dan VRAM GPU setiap selesai satu siklus
             gc.collect()

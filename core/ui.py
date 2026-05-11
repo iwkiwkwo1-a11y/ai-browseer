@@ -3,14 +3,17 @@ from IPython.display import display, Image, clear_output, HTML
 def render_terminal_ui(task, step, max_steps, agent_state, action_str, action_result, screenshot_bytes):
     """
     Me-render UI gaya terminal/Command Prompt di Google Colab.
-    Kini mendukung tampilan Memory, Plan, Reflection, dan Thought.
+    Kini mendukung tampilan Reasoning Engine OpenClaw-style.
     """
     clear_output(wait=True)
 
-    reflection = agent_state.get("reflection", "")
-    plan = agent_state.get("plan", "")
-    memory_obj = agent_state.get("memory", {})
-    thought = agent_state.get("thought", "")
+    reasoning = agent_state.get("reasoning_engine", {})
+    obs_analysis = reasoning.get("observation_analysis", "")
+    goal_prog = reasoning.get("goal_progress", "")
+    next_logic = reasoning.get("next_step_logic", "")
+
+    plan = agent_state.get("plan_update", agent_state.get("plan", ""))
+    memory_obj = agent_state.get("memory_update", agent_state.get("memory", {}))
 
     # Format Structured Memory ke HTML
     mem_html = ""
@@ -50,16 +53,15 @@ def render_terminal_ui(task, step, max_steps, agent_state, action_str, action_re
             </div>
         </div>
 
-        <div style="background-color: #161b22; padding: 10px; border-left: 3px solid #ff7b72; margin-bottom: 10px;">
-            <span style="color: #ff7b72; font-weight: bold;">[REFLECTION]</span> : {reflection}
-        </div>
-
-        <div style="background-color: #161b22; padding: 10px; border-left: 3px solid #79c0ff; margin-bottom: 10px;">
-            <span style="color: #79c0ff; font-weight: bold;">[THOUGHT]</span> : {thought}
+        <div style="background-color: #161b22; padding: 10px; border-left: 3px solid #d2a8ff; margin-bottom: 10px;">
+            <div style="color: #d2a8ff; font-weight: bold; margin-bottom: 5px;">[REASONING ENGINE]</div>
+            <div style="margin-bottom: 4px;"><strong style="color: #8b949e;">Observation:</strong> {obs_analysis}</div>
+            <div style="margin-bottom: 4px;"><strong style="color: #8b949e;">Goal Progress:</strong> {goal_prog}</div>
+            <div><strong style="color: #8b949e;">Next Logic:</strong> {next_logic}</div>
         </div>
 
         <div style="background-color: #161b22; padding: 10px; border-left: 3px solid #a5d6ff; margin-bottom: 10px;">
-            <span style="color: #a5d6ff; font-weight: bold;">[ACTION]</span> : {action_str}
+            <span style="color: #a5d6ff; font-weight: bold;">[COMMAND]</span> : {action_str}
         </div>
 
         <div style="background-color: #161b22; padding: 10px; border-left: 3px solid #3fb950; margin-bottom: 15px;">

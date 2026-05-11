@@ -98,7 +98,7 @@ class BrowserEnv:
 
     async def get_state(self):
         if not self.page:
-            return "Browser belum dimulai.", [], None
+            return {"error": "Browser belum dimulai."}, [], None
 
         # Pengecekan tab aktif
         try:
@@ -113,7 +113,7 @@ class BrowserEnv:
                 title = await self.page.title()
                 screenshot_bytes = await self.page.screenshot(type='jpeg', quality=60)
             else:
-                return "Semua tab tertutup.", [], None
+                return {"error": "Semua tab tertutup."}, [], None
 
         # Ekstrak elemen interactable
         elements = await self.page.evaluate(JS_EXTRACT_DOM)
@@ -127,16 +127,19 @@ class BrowserEnv:
         MAX_ELEMENTS = 75
         limited_elements = elements[:MAX_ELEMENTS]
 
-        dom_text = f"=== STATUS BROWSER ===\nTab Aktif: [{current_tab_idx + 1} dari {total_tabs}]\nURL saat ini: {url}\nJudul: {title}\n\nElemen yang bisa diklik (Maks {MAX_ELEMENTS}):\n"
-        if not limited_elements:
-            dom_text += "Tidak ada elemen interaktif yang ditemukan."
-        for el in limited_elements:
-            dom_text += f"[{el['id']}] {el['tag'].upper()}: {el['text']}\n"
+        # Bentuk state sebagai JSON/Dictionary murni
+        browser_state = {
+            "active_tab": {
+                "index": current_tab_idx + 1,
+                "total_tabs": total_tabs,
+                "url": url,
+                "title": title
+            },
+            "interactable_elements": limited_elements,
+            "hidden_elements_count": len(elements) - MAX_ELEMENTS if len(elements) > MAX_ELEMENTS else 0
+        }
 
-        if len(elements) > MAX_ELEMENTS:
-            dom_text += f"... (Ada {len(elements) - MAX_ELEMENTS} elemen lain disembunyikan agar memori aman. Gunakan SCROLL_DOWN jika perlu)\n"
-
-        return dom_text, elements, screenshot_bytes
+        return browser_state, elements, screenshot_bytes
 
     async def execute_action(self, action_type, arg1=None, arg2=None):
         try:
