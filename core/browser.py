@@ -9,6 +9,9 @@ JS_EXTRACT_DOM = r"""
     let elements = [];
     let id_counter = 0;
 
+    // Hapus atribut data-ai-id lama untuk mencegah duplikasi jika dieksekusi ulang
+    document.querySelectorAll('[data-ai-id]').forEach(el => el.removeAttribute('data-ai-id'));
+
     function isVisible(e) {
         return !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length) && window.getComputedStyle(e).visibility !== 'hidden';
     }
@@ -34,12 +37,14 @@ JS_EXTRACT_DOM = r"""
             if (text) {
                 const rect = el.getBoundingClientRect();
                 if (rect.width > 0 && rect.height > 0) {
+                    // Injeksi ID unik langsung ke elemen HTML
+                    let current_id = id_counter++;
+                    el.setAttribute('data-ai-id', current_id.toString());
+
                     elements.push({
-                        id: id_counter++,
+                        id: current_id,
                         tag: tag,
-                        text: text,
-                        x: rect.left + rect.width / 2,
-                        y: rect.top + rect.height / 2
+                        text: text
                     });
                 }
             }
@@ -140,38 +145,49 @@ class BrowserEnv:
                 if not url.startswith("http"):
                     url = "https://" + url
                 await self.page.goto(url, timeout=45000, wait_until="domcontentloaded")
-                await asyncio.sleep(2) # Kasih napas
+                try:
+                    # Coba tunggu network idle (berguna untuk SPA/web modern), lewati jika timeout
+                    await self.page.wait_for_load_state("networkidle", timeout=3000)
+                except Exception:
+                    pass
+                await asyncio.sleep(2) # Kasih napas visual
                 return f"Berhasil pergi ke {url}"
 
             elif action_type == "CLICK":
                 try:
-                    el_id = int(arg1)
+                    el_id = str(int(arg1)) # pastikan bisa di-cast ke int, lalu jadikan str
                 except:
                     return "Error: arg1 harus berupa angka ID."
 
-                el = next((e for e in self.interactable_elements if e['id'] == el_id), None)
-                if el:
-                    await self.page.mouse.click(el['x'], el['y'])
-                    await asyncio.sleep(3) # Kasih napas nunggu efek klik
-                    return f"Berhasil klik elemen [{el_id}] ({el['text']})"
+                locator = self.page.locator(f'[data-ai-id="{el_id}"]')
+                if await locator.count() > 0:
+                    # Scroll ke elemen (meski tidak perlu untuk locator.click, ini bagus untuk screenshot UI)
+                    await locator.first.scroll_into_view_if_needed()
+                    await locator.first.click()
+                    try:
+                        await self.page.wait_for_load_state("networkidle", timeout=2000)
+                    except Exception:
+                        pass
+                    await asyncio.sleep(2)
+                    return f"Berhasil klik elemen [{el_id}]."
                 else:
-                    return f"Error: Elemen ID {el_id} tidak ditemukan."
+                    return f"Error: Elemen ID {el_id} tidak ditemukan di halaman."
 
             elif action_type == "TYPE":
                 try:
-                    el_id = int(arg1)
+                    el_id = str(int(arg1))
                 except:
                     return "Error: arg1 harus berupa angka ID."
 
-                text_to_type = arg2
-                el = next((e for e in self.interactable_elements if e['id'] == el_id), None)
-                if el:
-                    await self.page.mouse.click(el['x'], el['y'])
-                    await asyncio.sleep(0.5)
-                    await self.page.keyboard.type(text_to_type, delay=50) # Ketik layaknya manusia
-                    await self.page.keyboard.press("Enter")
-                    await asyncio.sleep(3)
-                    return f"Berhasil mengetik '{text_to_type}' pada elemen [{el_id}]"
+                text_to_type = str(arg2)
+                locator = self.page.locator(f'[data-ai-id="{el_id}"]')
+
+                if await locator.count() > 0:
+                    await locator.first.scroll_into_view_if_needed()
+                    # Gunakan fill() untuk menghapus isi sebelumnya, lalu ketik
+                    await locator.first.fill(text_to_type)
+                    await asyncio.sleep(1)
+                    return f"Berhasil mengisi '{text_to_type}' pada elemen [{el_id}]. (Ingat: Anda mungkin perlu memanggil CLICK atau PRESS_KEY Enter setelah ini)"
                 else:
                     return f"Error: Elemen ID {el_id} tidak ditemukan."
 

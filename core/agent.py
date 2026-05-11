@@ -30,7 +30,7 @@ Tersedia Action:
 - "SWITCH_TAB": Pindah ke tab lain. (args: { "index": "2" })
 - "CLOSE_TAB": Tutup tab saat ini. (args: {})
 - "CLICK": Klik elemen berdasarkan ID. (args: { "id": "..." })
-- "TYPE": Ketik teks ke elemen berdasarkan ID dan tekan Enter. (args: { "id": "...", "text": "..." })
+- "TYPE": Isi teks ke elemen input berdasarkan ID. Ini HANYA mengisi teks, TIDAK menekan Enter. (Gunakan PRESS_KEY "Enter" atau CLICK tombol submit setelahnya jika perlu). (args: { "id": "...", "text": "..." })
 - "SCROLL_DOWN": Gulir ke bawah halaman. (args: {})
 - "SCROLL_TO_TEXT": Cari dan gulir layar langsung ke teks tertentu. Jauh lebih efektif daripada SCROLL_DOWN manual! (args: { "text": "..." })
 - "GO_BACK": Mundur ke halaman sebelumnya. (Gunakan jika tersesat/buntu). (args: {})
@@ -44,7 +44,7 @@ Tersedia Action:
 ATURAN KRITIS (ANTI-LOOPING & MEMORI):
 1. MANAJEMEN TAB: Jangan ragu menggunakan 'NEW_TAB' saat membaca artikel dari Google agar Anda bisa kembali ke halaman pencarian dengan 'CLOSE_TAB'.
 2. JANGAN MENGULANG: Jika history aksi menunjukkan Anda melakukan hal yang sama tanpa hasil, JANGAN ULANGI! Gunakan 'GO_BACK', 'SCROLL_TO_TEXT', atau cari elemen lain.
-3. MEMORI PERSISTEN: JANGAN mengosongkan 'memory' di JSON jika sebelumnya sudah ada catatan berharga. Terus tumpuk/tulis ulang.
+3. MEMORI PERSISTEN PADAT: Tulis 'memory' dalam bentuk catatan atau bullet-point yang ringkas namun informatif.
 """
 
 class BrowserAgent:
@@ -95,7 +95,9 @@ Balas HANYA dengan JSON valid."""
                 if decision.get("plan"):
                     self.current_plan = decision["plan"]
                 if decision.get("memory"):
-                    self.current_memory = decision["memory"]
+                    # Hard limit memory untuk mencegah OOM jika AI menulis buku
+                    new_mem = str(decision["memory"])
+                    self.current_memory = new_mem[:2000] + ("..." if len(new_mem) > 2000 else "")
 
             return decision
 
