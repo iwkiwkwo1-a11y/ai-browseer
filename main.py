@@ -83,8 +83,16 @@ async def run_loop(task, max_steps=15):
         for step in range(1, max_steps + 1):
             dom_text, elements, screenshot = await env.get_state()
 
+            # Mempersiapkan state UI kosong
+            ui_state = {
+                "reflection": "...",
+                "plan": agent.current_plan,
+                "memory": agent.current_memory,
+                "thought": "Membaca DOM dan Memikirkan langkah selanjutnya..."
+            }
+
             # Tampilkan ke UI sebelum diproses (Status: Thinking)
-            render_terminal_ui(task, step, max_steps, "Membaca DOM dan Memikirkan langkah selanjutnya...", "...", action_result, screenshot)
+            render_terminal_ui(task, step, max_steps, ui_state, "...", action_result, screenshot)
 
             # Agent mengambil keputusan
             decision = agent.get_decision(task, history, dom_text)
@@ -93,13 +101,18 @@ async def run_loop(task, max_steps=15):
             if "error" in decision:
                 action_result = f"Error dari AI: {decision['error']}"
                 history.append(f"AI ERROR: {decision['error']}")
-                render_terminal_ui(task, step, max_steps, "Gagal memproses JSON. Mencoba lagi.", "Koreksi JSON", action_result, screenshot)
+                ui_state["thought"] = "Gagal memproses JSON. Mencoba lagi."
+                render_terminal_ui(task, step, max_steps, ui_state, "Koreksi JSON", action_result, screenshot)
                 await asyncio.sleep(2)
                 continue
 
             thought = decision.get("thought", "Tidak ada thought")
             action = decision.get("action", "")
             args = decision.get("args", {})
+
+            ui_state = decision
+            ui_state["plan"] = agent.current_plan
+            ui_state["memory"] = agent.current_memory
 
             # Format Argumen menjadi string rapi
             if isinstance(args, dict):
@@ -110,12 +123,12 @@ async def run_loop(task, max_steps=15):
             action_str = f"{action}({args_str})"
 
             # Update UI dengan keputusan sebelum eksekusi
-            render_terminal_ui(task, step, max_steps, thought, action_str, "Mengeksekusi...", screenshot)
+            render_terminal_ui(task, step, max_steps, ui_state, action_str, "Mengeksekusi...", screenshot)
 
             # Eksekusi DONE
             if action == "DONE":
                 final_res = args.get("result", "")
-                render_terminal_ui(task, step, max_steps, thought, "SELESAI", f"Tugas Selesai: {final_res}", screenshot)
+                render_terminal_ui(task, step, max_steps, ui_state, "SELESAI", f"Tugas Selesai: {final_res}", screenshot)
                 print(f"\n✅ [AI SELESAI] Hasil: {final_res}")
                 break
 
@@ -133,6 +146,8 @@ async def run_loop(task, max_steps=15):
                 arg1 = args.get("key")
             elif action == "WAIT":
                 arg1 = args.get("seconds")
+            elif action == "EXTRACT_TEXT":
+                pass # tidak butuh args
 
             action_result = await env.execute_action(action, arg1, arg2)
 

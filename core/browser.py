@@ -174,6 +174,15 @@ class BrowserEnv:
                 await asyncio.sleep(sec)
                 return f"Berhasil diam menunggu selama {sec} detik."
 
+            elif action_type == "EXTRACT_TEXT":
+                # Ekstrak semua teks bacaan di halaman (hanya teks yang terlihat)
+                text_content = await self.page.evaluate('''() => {
+                    return document.body.innerText;
+                }''')
+                # Bersihkan spasi kosong dan batasi panjang teks
+                clean_text = ' '.join(text_content.split())
+                return clean_text[:2000] + ("..." if len(clean_text) > 2000 else "")
+
             elif action_type == "DONE":
                 return "Tugas dinyatakan selesai oleh AI."
 
