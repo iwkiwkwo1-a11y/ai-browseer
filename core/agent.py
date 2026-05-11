@@ -63,6 +63,30 @@ PERINGATAN KRITIS:
 1. Objek 'memory_update' akan MENGGANTI memori Anda. Jika ada data lama yang penting, sertakan kembali di 'memory_update'. Maksimal 5 item per list agar tidak Out of Memory.
 2. Jika Anda menyadari Anda stuck dalam loop (mengulangi perintah tanpa hasil), reasoning_engine.next_step_logic WAJIB memutuskan untuk GO_BACK atau CLOSE_TAB.
 3. HANYA KELUARKAN JSON!
+
+CONTOH OUTPUT YANG DIHARAPKAN 1 (BERHASIL):
+{
+  "reasoning_engine": {
+    "observation_analysis": "Halaman menampilkan kotak pencarian (ID 0).",
+    "goal_progress": "Baru mulai, mencari info Emas.",
+    "next_step_logic": "Mengetik kueri pencarian."
+  },
+  "memory_update": { "facts": [], "failed_paths": [], "notes": "Mencari Emas." },
+  "plan_update": "1. Cari Emas. 2. Ekstrak teks.",
+  "command": { "name": "TYPE", "args": { "id": "0", "text": "Harga Emas" } }
+}
+
+CONTOH OUTPUT YANG DIHARAPKAN 2 (JEBAKAN/LOOPING):
+{
+  "reasoning_engine": {
+    "observation_analysis": "Saya sudah mencoba klik ID 5 dua kali di action_history, tapi halaman tidak berubah sama sekali.",
+    "goal_progress": "Terhenti. Tombol ID 5 rusak atau ini jalan buntu.",
+    "next_step_logic": "Saya harus berhenti mencoba ID 5 dan mundur menggunakan GO_BACK."
+  },
+  "memory_update": { "facts": [], "failed_paths": ["Klik ID 5 gagal/tidak merespon"], "notes": "Hindari elemen 5." },
+  "plan_update": "1. Mundur dari halaman ini. 2. Cari link lain.",
+  "command": { "name": "GO_BACK", "args": {} }
+}
 """
 
 class BrowserAgent:
@@ -89,42 +113,50 @@ class BrowserAgent:
             pass
 
     def get_decision(self, task, history, current_state):
-        # Batasi history ke 2 langkah terakhir saja untuk menghemat VRAM
-        prompt_history = "\n".join(history[-2:]) if history else "Belum ada aksi."
-
-        # Susun input JSON layaknya API OpenClaw
+        # Susun input dasar
         agent_input = {
             "task": task,
-            "browser_state": current_state, # current_state dari browser sekarang adalah dict
+            "browser_state": current_state,
             "action_history": history[-2:] if history else [],
             "current_memory": self.current_memory,
             "current_plan": self.current_plan
         }
 
         user_prompt = json.dumps(agent_input, indent=2)
-
         messages = [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt}
         ]
 
-        try:
-            # Gunakan Qwen 2.5
-            outputs = self.pipe(
-                messages,
-                max_new_tokens=768, # Diperbesar karena output kognitif lebih panjang
-                do_sample=False,
-            )
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                outputs = self.pipe(
+                    messages,
+                    max_new_tokens=768,
+                    do_sample=False,
+                )
 
-            response_text = outputs[0]["generated_text"][-1]["content"]
-            decision = self._parse_json(response_text)
+                response_text = outputs[0]["generated_text"][-1]["content"]
+                decision = self._parse_json(response_text)
 
-            if "error" not in decision:
-                # Update Plan
+                # Jika parsing gagal, trigger Self-Correction internal LLM
+                if "error" in decision:
+                    if attempt < max_retries - 1:
+                        # Feed error back as a user message forcing correction
+                        messages.append({"role": "assistant", "content": response_text})
+                        messages.append({
+                            "role": "user",
+                            "content": "Sistem gagal membaca respons Anda. WAJIB balas HANYA dengan format JSON yang valid, tanpa teks markdown atau kalimat pembuka/penutup."
+                        })
+                        continue # Retry LLM call
+                    else:
+                        return decision # Give up after max_retries
+
+                # Update State if successful
                 if decision.get("plan_update"):
                     self.current_plan = decision["plan_update"]
 
-                # Update Memori
                 mem_update = decision.get("memory_update")
                 if mem_update and isinstance(mem_update, dict):
                     facts = mem_update.get("facts", [])[:5]
@@ -133,10 +165,10 @@ class BrowserAgent:
                     self.current_memory = {"facts": facts, "failed_paths": failed, "notes": notes}
                     self._save_memory()
 
-            return decision
+                return decision
 
-        except Exception as e:
-            return {"error": str(e), "raw": ""}
+            except Exception as e:
+                return {"error": str(e), "raw": ""}
 
     def _parse_json(self, text):
         match = re.search(r'\{.*\}', text, re.DOTALL)

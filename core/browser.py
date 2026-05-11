@@ -221,11 +221,26 @@ class BrowserEnv:
                 return f"Berhasil diam menunggu selama {sec} detik."
 
             elif action_type == "EXTRACT_TEXT":
-                # Ekstrak semua teks bacaan di halaman (hanya teks yang terlihat)
+                # Ekstrak teks cerdas: Prioritaskan konten artikel/utama untuk menghindari footer/menu
                 text_content = await self.page.evaluate('''() => {
-                    return document.body.innerText;
+                    // Coba cari tag utama
+                    let mainNode = document.querySelector('article') || document.querySelector('main');
+                    if (mainNode) return mainNode.innerText;
+
+                    // Fallback: Cari div yang memiliki paling banyak tag <p> (biasanya ini isi artikel)
+                    let maxP = 0;
+                    let bestDiv = document.body;
+                    document.querySelectorAll('div').forEach(div => {
+                        let pCount = div.querySelectorAll('p').length;
+                        if (pCount > maxP) {
+                            maxP = pCount;
+                            bestDiv = div;
+                        }
+                    });
+
+                    return bestDiv.innerText;
                 }''')
-                # Bersihkan spasi kosong dan batasi panjang teks (limit keras agar tidak OOM)
+                # Bersihkan spasi kosong dan batasi panjang teks
                 clean_text = ' '.join(text_content.split())
                 return clean_text[:1200] + ("..." if len(clean_text) > 1200 else "")
 
