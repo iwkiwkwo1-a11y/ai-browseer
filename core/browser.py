@@ -101,11 +101,18 @@ class BrowserEnv:
         elements = await self.page.evaluate(JS_EXTRACT_DOM)
         self.interactable_elements = elements
 
+        # Batasi agar tidak OOM (Out of Memory)
+        MAX_ELEMENTS = 75
+        limited_elements = elements[:MAX_ELEMENTS]
+
         dom_text = f"URL saat ini: {url}\nJudul: {title}\nElemen yang bisa diklik:\n"
-        if not elements:
+        if not limited_elements:
             dom_text += "Tidak ada elemen interaktif yang ditemukan."
-        for el in elements:
+        for el in limited_elements:
             dom_text += f"[{el['id']}] {el['tag'].upper()}: {el['text']}\n"
+
+        if len(elements) > MAX_ELEMENTS:
+            dom_text += f"... (Ada {len(elements) - MAX_ELEMENTS} elemen lain disembunyikan agar memori aman. Gunakan SCROLL_DOWN jika perlu)\n"
 
         return dom_text, elements, screenshot_bytes
 
@@ -182,9 +189,9 @@ class BrowserEnv:
                 text_content = await self.page.evaluate('''() => {
                     return document.body.innerText;
                 }''')
-                # Bersihkan spasi kosong dan batasi panjang teks
+                # Bersihkan spasi kosong dan batasi panjang teks (limit keras agar tidak OOM)
                 clean_text = ' '.join(text_content.split())
-                return clean_text[:2000] + ("..." if len(clean_text) > 2000 else "")
+                return clean_text[:1200] + ("..." if len(clean_text) > 1200 else "")
 
             elif action_type == "READ_PDF":
                 pdf_url = arg1
@@ -209,7 +216,7 @@ class BrowserEnv:
                                         text += page_text + " "
 
                                 clean_text = ' '.join(text.split())
-                                return clean_text[:2500] + ("..." if len(clean_text) > 2500 else "")
+                                return clean_text[:1500] + ("..." if len(clean_text) > 1500 else "")
                             else:
                                 return f"Error mengunduh PDF, HTTP status: {resp.status}"
                 except Exception as e:

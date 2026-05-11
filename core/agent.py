@@ -47,7 +47,8 @@ class BrowserAgent:
         self.current_memory = "Kosong."
 
     def get_decision(self, task, history, current_state):
-        prompt_history = "\n".join(history[-4:]) if history else "Belum ada aksi."
+        # Batasi history ke 2 langkah terakhir saja untuk menghemat VRAM
+        prompt_history = "\n".join(history[-2:]) if history else "Belum ada aksi."
 
         user_prompt = f"""TUGAS UTAMA: {task}
 

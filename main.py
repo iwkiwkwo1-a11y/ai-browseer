@@ -3,6 +3,7 @@ import subprocess
 import sys
 import asyncio
 import time
+import gc
 
 def check_and_install_deps():
     print("[SYSTEM] Memeriksa dependensi...")
@@ -158,10 +159,16 @@ async def run_loop(task, max_steps=15):
             # Catat history (Penting agar tidak looping)
             history.append(f"Aksi: {action_str} -> Hasil: {action_result}")
 
+            # [ANTI-OOM] Bersihkan sampah memori dan VRAM GPU setiap selesai satu siklus
+            gc.collect()
+            torch.cuda.empty_cache()
+
     except Exception as e:
         print(f"\n❌ [SYSTEM ERROR] {str(e)}")
     finally:
         await env.close()
+        gc.collect()
+        torch.cuda.empty_cache()
 
 def run(task, max_steps=20):
     try:
