@@ -56,12 +56,13 @@ REFERENSI ALAT (NAMA_AKSI):
 - "WAIT": (args: { "seconds": "3" })
 - "EXTRACT_TEXT": Ambil isi teks artikel saat ini. (args: {})
 - "READ_PDF": Ambil isi PDF. (args: { "url": "..." })
+- "EVALUATE_JS": Eksekusi skrip JavaScript murni di browser (Sangat berguna untuk menghapus popup iklan, mengekstrak tabel kompleks, atau scroll custom). (args: { "script": "document.getElementById('popup').remove();" })
 - "SAVE_REPORT": Simpan file lokal Colab. (args: { "filename": "hasil.txt", "content": "..." })
 - "DONE": Selesaikan tugas. (args: { "result": "..." })
 
 PERINGATAN KRITIS:
 1. Objek 'memory_update' akan MENGGANTI memori Anda. Jika ada data lama yang penting, sertakan kembali di 'memory_update'. Maksimal 5 item per list agar tidak Out of Memory.
-2. Jika Anda menyadari Anda stuck dalam loop (mengulangi perintah tanpa hasil), reasoning_engine.next_step_logic WAJIB memutuskan untuk GO_BACK atau CLOSE_TAB.
+2. Jika Anda menyadari Anda stuck dalam loop (mengulangi perintah tanpa hasil), reasoning_engine.next_step_logic WAJIB memutuskan untuk GO_BACK, CLOSE_TAB, atau gunakan EVALUATE_JS untuk memanipulasi DOM.
 3. HANYA KELUARKAN JSON!
 
 CONTOH OUTPUT YANG DIHARAPKAN 1 (BERHASIL):

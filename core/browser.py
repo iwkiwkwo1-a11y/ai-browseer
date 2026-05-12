@@ -31,22 +31,42 @@ JS_EXTRACT_DOM = r"""
         }
 
         if (isInteractable) {
-            let text = el.innerText || el.value || el.placeholder || el.getAttribute('aria-label') || el.alt || "";
-            text = text.replace(/\n/g, ' ').trim().substring(0, 50);
+            let inner_text = (el.innerText || el.value || "").replace(/\n/g, ' ').trim();
+            let aria_label = el.getAttribute('aria-label') || "";
+            let title = el.getAttribute('title') || "";
+            let placeholder = el.placeholder || "";
+            let alt = el.alt || "";
 
-            if (text) {
-                const rect = el.getBoundingClientRect();
-                if (rect.width > 0 && rect.height > 0) {
-                    // Injeksi ID unik langsung ke elemen HTML
-                    let current_id = id_counter++;
-                    el.setAttribute('data-ai-id', current_id.toString());
+            let descriptive_text = inner_text;
+            let extra_info = [];
 
-                    elements.push({
-                        id: current_id,
-                        tag: tag,
-                        text: text
-                    });
-                }
+            if (!descriptive_text) {
+                descriptive_text = "No Text/Icon";
+            } else {
+                descriptive_text = descriptive_text.substring(0, 40);
+            }
+
+            if (aria_label) extra_info.push(`aria: ${aria_label}`);
+            if (title) extra_info.push(`title: ${title}`);
+            if (placeholder) extra_info.push(`placeholder: ${placeholder}`);
+            if (alt) extra_info.push(`alt: ${alt}`);
+
+            let final_text = descriptive_text;
+            if (extra_info.length > 0) {
+                final_text += " (" + extra_info.join(', ') + ")";
+            }
+
+            const rect = el.getBoundingClientRect();
+            if (rect.width > 0 && rect.height > 0) {
+                // Injeksi ID unik langsung ke elemen HTML
+                let current_id = id_counter++;
+                el.setAttribute('data-ai-id', current_id.toString());
+
+                elements.push({
+                    id: current_id,
+                    tag: tag,
+                    text: final_text
+                });
             }
         }
     });
@@ -301,6 +321,24 @@ class BrowserEnv:
                     return f"Berhasil menemukan dan scroll ke bagian teks '{search_text}'."
                 else:
                     return f"Teks '{search_text}' tidak ditemukan di halaman ini."
+
+            elif action_type == "EVALUATE_JS":
+                script = arg1
+                if not script:
+                    return "Error: arg1 (skrip JS) kosong."
+                try:
+                    js_result = await self.page.evaluate(f'''() => {{
+                        try {{
+                            {script}
+                            return "Skrip dieksekusi tanpa error.";
+                        }} catch (e) {{
+                            return "Error eksekusi: " + e.message;
+                        }}
+                    }}''')
+                    await asyncio.sleep(2)
+                    return f"Hasil EVALUATE_JS: {js_result}"
+                except Exception as e:
+                    return f"Gagal mengeksekusi JavaScript: {str(e)}"
 
             elif action_type == "SAVE_REPORT":
                 filename = arg1 if arg1 else "report.txt"

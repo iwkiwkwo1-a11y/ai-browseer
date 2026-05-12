@@ -165,6 +165,8 @@ async def run_loop(task, max_steps=15):
                 pass
             elif action == "SCROLL_TO_TEXT":
                 arg1 = args.get("text")
+            elif action == "EVALUATE_JS":
+                arg1 = args.get("script")
             elif action == "SAVE_REPORT":
                 arg1 = args.get("filename")
                 arg2 = args.get("content")
