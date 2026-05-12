@@ -9,67 +9,89 @@ JS_EXTRACT_DOM = r"""
     let elements = [];
     let id_counter = 0;
 
-    // Hapus atribut data-ai-id lama untuk mencegah duplikasi jika dieksekusi ulang
-    document.querySelectorAll('[data-ai-id]').forEach(el => el.removeAttribute('data-ai-id'));
-
+    // Helper fungsi untuk mendeteksi visibilitas
     function isVisible(e) {
+        if (e.nodeType !== Node.ELEMENT_NODE) return false;
         return !!(e.offsetWidth || e.offsetHeight || e.getClientRects().length) && window.getComputedStyle(e).visibility !== 'hidden';
     }
 
-    document.querySelectorAll('*').forEach(el => {
-        if (!isVisible(el)) return;
+    // Traverse rekursif untuk menembus Shadow DOM
+    function traverse(node) {
+        if (!node) return;
 
-        let isInteractable = false;
-        const tag = el.tagName.toLowerCase();
-        const role = el.getAttribute('role');
+        // Cek interaktifitas jika ini adalah elemen
+        if (node.nodeType === Node.ELEMENT_NODE && isVisible(node)) {
+            // Hapus ID lama
+            if (node.hasAttribute && node.hasAttribute('data-ai-id')) {
+                node.removeAttribute('data-ai-id');
+            }
 
-        if (['a', 'button', 'input', 'select', 'textarea'].includes(tag) ||
-            el.onclick != null ||
-            role === 'button' || role === 'link' ||
-            window.getComputedStyle(el).cursor === 'pointer') {
-            isInteractable = true;
+            let isInteractable = false;
+            const tag = node.tagName.toLowerCase();
+            const role = node.getAttribute('role');
+
+            if (['a', 'button', 'input', 'select', 'textarea'].includes(tag) ||
+                node.onclick != null ||
+                role === 'button' || role === 'link' ||
+                window.getComputedStyle(node).cursor === 'pointer') {
+                isInteractable = true;
+            }
+
+            if (isInteractable) {
+                let inner_text = (node.innerText || node.value || "").replace(/\n/g, ' ').trim();
+                let aria_label = node.getAttribute('aria-label') || "";
+                let title = node.getAttribute('title') || "";
+                let placeholder = node.placeholder || "";
+                let alt = node.alt || "";
+
+                let descriptive_text = inner_text;
+                let extra_info = [];
+
+                if (!descriptive_text) {
+                    descriptive_text = "No Text/Icon";
+                } else {
+                    descriptive_text = descriptive_text.substring(0, 40);
+                }
+
+                if (aria_label) extra_info.push(`aria: ${aria_label}`);
+                if (title) extra_info.push(`title: ${title}`);
+                if (placeholder) extra_info.push(`placeholder: ${placeholder}`);
+                if (alt) extra_info.push(`alt: ${alt}`);
+
+                let final_text = descriptive_text;
+                if (extra_info.length > 0) {
+                    final_text += " (" + extra_info.join(', ') + ")";
+                }
+
+                const rect = node.getBoundingClientRect();
+                if (rect.width > 0 && rect.height > 0) {
+                    let current_id = id_counter++;
+                    node.setAttribute('data-ai-id', current_id.toString());
+
+                    elements.push({
+                        id: current_id,
+                        tag: tag,
+                        text: final_text
+                    });
+                }
+            }
         }
 
-        if (isInteractable) {
-            let inner_text = (el.innerText || el.value || "").replace(/\n/g, ' ').trim();
-            let aria_label = el.getAttribute('aria-label') || "";
-            let title = el.getAttribute('title') || "";
-            let placeholder = el.placeholder || "";
-            let alt = el.alt || "";
-
-            let descriptive_text = inner_text;
-            let extra_info = [];
-
-            if (!descriptive_text) {
-                descriptive_text = "No Text/Icon";
-            } else {
-                descriptive_text = descriptive_text.substring(0, 40);
-            }
-
-            if (aria_label) extra_info.push(`aria: ${aria_label}`);
-            if (title) extra_info.push(`title: ${title}`);
-            if (placeholder) extra_info.push(`placeholder: ${placeholder}`);
-            if (alt) extra_info.push(`alt: ${alt}`);
-
-            let final_text = descriptive_text;
-            if (extra_info.length > 0) {
-                final_text += " (" + extra_info.join(', ') + ")";
-            }
-
-            const rect = el.getBoundingClientRect();
-            if (rect.width > 0 && rect.height > 0) {
-                // Injeksi ID unik langsung ke elemen HTML
-                let current_id = id_counter++;
-                el.setAttribute('data-ai-id', current_id.toString());
-
-                elements.push({
-                    id: current_id,
-                    tag: tag,
-                    text: final_text
-                });
+        // Jelajahi anak elemen
+        if (node.childNodes) {
+            for (let child of node.childNodes) {
+                traverse(child);
             }
         }
-    });
+
+        // Jelajahi Shadow DOM jika ada (Deep Piercing)
+        if (node.shadowRoot) {
+            traverse(node.shadowRoot);
+        }
+    }
+
+    // Mulai dari root
+    traverse(document.body);
 
     return elements;
 }
@@ -95,6 +117,13 @@ class BrowserEnv:
         self.pages = []  # List untuk menyimpan multiple tabs
         self.interactable_elements = []
 
+    async def _handle_dialog(self, dialog):
+        """Auto-Recovery: Otomatis men-dismiss alert/confirm dialog agar page tidak freeze."""
+        try:
+            await dialog.dismiss()
+        except Exception:
+            pass
+
     async def start(self):
         self.playwright = await async_playwright().start()
         # Menggunakan chromium biasa namun dengan argumen tambahan untuk stealth
@@ -114,6 +143,8 @@ class BrowserEnv:
         # Injeksi stealth script ke setiap halaman baru
         await self.context.add_init_script(STEALTH_SCRIPT)
         self.page = await self.context.new_page()
+        # Pasang listener dialog untuk Auto-Recovery
+        self.page.on("dialog", self._handle_dialog)
         self.pages.append(self.page)
 
     async def get_state(self):
@@ -269,6 +300,7 @@ class BrowserEnv:
                 if url and not url.startswith("http"):
                     url = "https://" + url
                 new_page = await self.context.new_page()
+                new_page.on("dialog", self._handle_dialog) # Pasang auto-recovery
                 self.pages.append(new_page)
                 self.page = new_page # Pindah fokus
                 if url:
