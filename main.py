@@ -146,11 +146,17 @@ async def run_loop(task, max_steps=15):
                 arg1 = args.get("url")
             elif action == "CLICK":
                 arg1 = args.get("id")
+            elif action == "CSS_CLICK":
+                arg1 = args.get("selector")
+            elif action == "XPATH_CLICK":
+                arg1 = args.get("xpath")
             elif action == "TYPE":
                 arg1 = args.get("id")
                 arg2 = args.get("text")
             elif action == "PRESS_KEY":
                 arg1 = args.get("key")
+            elif action == "KEYBOARD_SHORTCUT":
+                arg1 = args.get("keys")
             elif action == "WAIT":
                 arg1 = args.get("seconds")
             elif action == "EXTRACT_TEXT":

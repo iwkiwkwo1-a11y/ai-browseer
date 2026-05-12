@@ -219,13 +219,35 @@ class BrowserEnv:
                     await locator.first.scroll_into_view_if_needed()
                     await locator.first.click()
                     try:
-                        await self.page.wait_for_load_state("networkidle", timeout=2000)
+                        await self.page.wait_for_load_state("networkidle", timeout=3000)
                     except Exception:
                         pass
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(3) # Ekstra tunggu untuk SPA React/Vue (Facebook/Twitter)
                     return f"Berhasil klik elemen [{el_id}]."
                 else:
                     return f"Error: Elemen ID {el_id} tidak ditemukan di halaman."
+
+            elif action_type == "CSS_CLICK":
+                selector = arg1
+                if not selector: return "Error: selector kosong."
+                locator = self.page.locator(selector)
+                if await locator.count() > 0:
+                    await locator.first.scroll_into_view_if_needed()
+                    await locator.first.click()
+                    await asyncio.sleep(3)
+                    return f"Berhasil klik elemen dengan selector: {selector}."
+                return f"Error: Tidak menemukan elemen dengan selector: {selector}"
+
+            elif action_type == "XPATH_CLICK":
+                xpath = arg1
+                if not xpath: return "Error: xpath kosong."
+                locator = self.page.locator(f"xpath={xpath}")
+                if await locator.count() > 0:
+                    await locator.first.scroll_into_view_if_needed()
+                    await locator.first.click()
+                    await asyncio.sleep(3)
+                    return f"Berhasil klik elemen dengan xpath: {xpath}."
+                return f"Error: Tidak menemukan elemen dengan xpath: {xpath}"
 
             elif action_type == "TYPE":
                 try:
@@ -260,6 +282,12 @@ class BrowserEnv:
                 await self.page.keyboard.press(key)
                 await asyncio.sleep(2)
                 return f"Berhasil menekan tombol {key}"
+
+            elif action_type == "KEYBOARD_SHORTCUT":
+                keys = arg1 # misal "Control+A", "Meta+C"
+                await self.page.keyboard.press(keys)
+                await asyncio.sleep(1)
+                return f"Berhasil menekan kombinasi tombol {keys}"
 
             elif action_type == "WAIT":
                 sec = 3

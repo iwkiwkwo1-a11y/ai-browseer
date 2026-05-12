@@ -48,11 +48,14 @@ REFERENSI ALAT (NAMA_AKSI):
 - "SWITCH_TAB": Pindah tab aktif. (args: { "index": "2" })
 - "CLOSE_TAB": Tutup tab saat ini. (args: {})
 - "CLICK": Klik elemen ID. (args: { "id": "..." })
+- "CSS_CLICK": Klik dengan selector CSS jika CLICK ID gagal. (args: { "selector": ".btn-login" })
+- "XPATH_CLICK": Klik dengan XPath jika CLICK ID gagal. (args: { "xpath": "//button[text()='Login']" })
 - "TYPE": Isi input ID (Tanpa auto-Enter). (args: { "id": "...", "text": "..." })
 - "SCROLL_DOWN": Gulir ke bawah halaman. (args: {})
 - "SCROLL_TO_TEXT": Injeksi scroll langsung ke teks tertentu. (args: { "text": "..." })
 - "GO_BACK": Mundur navigasi. (args: {})
 - "PRESS_KEY": Tekan tombol ("Escape", "Enter"). (args: { "key": "..." })
+- "KEYBOARD_SHORTCUT": Tekan kombinasi tombol ("Control+A", "Tab"). (args: { "keys": "..." })
 - "WAIT": (args: { "seconds": "3" })
 - "EXTRACT_TEXT": Ambil isi teks artikel saat ini. (args: {})
 - "READ_PDF": Ambil isi PDF. (args: { "url": "..." })
@@ -62,7 +65,7 @@ REFERENSI ALAT (NAMA_AKSI):
 
 PERINGATAN KRITIS:
 1. Objek 'memory_update' akan MENGGANTI memori Anda. Jika ada data lama yang penting, sertakan kembali di 'memory_update'. Maksimal 5 item per list agar tidak Out of Memory.
-2. Jika Anda menyadari Anda stuck dalam loop (mengulangi perintah tanpa hasil), reasoning_engine.next_step_logic WAJIB memutuskan untuk GO_BACK, CLOSE_TAB, atau gunakan EVALUATE_JS untuk memanipulasi DOM.
+2. Jika Anda menyadari Anda stuck dalam loop karena CLICK ID gagal, gunakan CSS_CLICK, XPATH_CLICK, EVALUATE_JS, atau GO_BACK.
 3. HANYA KELUARKAN JSON!
 
 CONTOH OUTPUT YANG DIHARAPKAN 1 (BERHASIL):
